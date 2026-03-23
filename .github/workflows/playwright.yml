@@ -1,0 +1,113 @@
+name: Playwright Tests
+
+on:
+  # Nightly execution at 2:00 AM UTC (rules.md §7)
+  schedule:
+    - cron: "0 2 * * *"
+
+  # Run on pull requests targeting main
+  pull_request:
+    branches: [main]
+
+  # Allow manual execution from the Actions tab
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (prod, staging)"
+        required: false
+        default: "prod"
+        type: choice
+        options:
+          - prod
+          - staging
+
+# Cancel in-progress runs for the same PR/branch to save resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Job 1: Static Analysis Gate (rules.md §4)
+  # ESLint + Prettier must pass BEFORE tests run
+  # ===========================================================================
+  lint:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check Prettier formatting
+        run: npm run format:check
+
+  # ===========================================================================
+  # Job 2: Playwright Test Execution
+  # Runs after lint passes. Parallel across Chromium & WebKit (rules.md §7)
+  # ===========================================================================
+  test:
+    name: Playwright Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (Chromium + WebKit only)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        env:
+          CI: true
+          TEST_ENV: ${{ github.event.inputs.environment || 'prod' }}
+          # Secrets injected from GitHub repository settings
+          BASE_URL: ${{ secrets.BASE_URL }}
+          API_URL: ${{ secrets.BASE_URL }}/api/candidate
+          ADMIN_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      # -----------------------------------------------------------------------
+      # Artifacts (rules.md §7)
+      # -----------------------------------------------------------------------
+
+      # HTML Report — always uploaded, even if tests fail
+      - name: Upload Playwright HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-html-report
+          path: playwright-report/
+          retention-days: 14
+
+      # Videos & Traces — uploaded only on failure for debugging
+      - name: Upload test videos and traces on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 14

@@ -1,0 +1,57 @@
+{
+  "name": "q_ide_default",
+  "description": "Default agent configuration",
+  "prompt": "",
+  "mcpServers": {
+    "browser-automation": {
+      "command": "npx.cmd",
+      "disabled": false,
+      "timeout": 60000,
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ]
+    }
+  },
+  "tools": [
+    "fs_read",
+    "execute_bash",
+    "fs_write",
+    "report_issue",
+    "use_aws",
+    "@browser-automation"
+  ],
+  "toolAliases": {},
+  "allowedTools": [
+    "fs_read",
+    "report_issue",
+    "use_aws",
+    "execute_bash",
+    "fs_write",
+    "@browser-automation/puppeteer_navigate",
+    "@browser-automation/puppeteer_screenshot",
+    "@browser-automation/puppeteer_click",
+    "@browser-automation/puppeteer_fill",
+    "@browser-automation/puppeteer_select",
+    "@browser-automation/puppeteer_hover",
+    "@browser-automation/puppeteer_evaluate"
+  ],
+  "toolsSettings": {
+    "use_aws": {
+      "preset": "readOnly"
+    },
+    "execute_bash": {
+      "preset": "readOnly"
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://README.md",
+    "file://.amazonq/rules/**/*.md"
+  ],
+  "hooks": {
+    "agentSpawn": [],
+    "userPromptSubmit": []
+  },
+  "useLegacyMcpJson": true
+}
